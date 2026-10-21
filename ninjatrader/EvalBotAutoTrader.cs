@@ -1,6 +1,6 @@
 // EvalBot AutoTrader V0.2 — native NinjaTrader 8 strategy.
 // Standalone execution engine: no Python, bridge, or external service required.
-// Experimental. Validate in Strategy Analyzer and Sim101 before any authorized live use.
+// Experimental automatic strategy. No mandatory Sim101 step; validate before deployment.
 #region Using declarations
 using System;
 using System.ComponentModel.DataAnnotations;
@@ -27,7 +27,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Name = "EvalBotAutoTrader";
-                Description = "Native automatic sweep/reclaim strategy with protective orders and daily risk limits.";
+                Description = "Automatic order execution on the selected NinjaTrader account, with stop, target and configurable risk controls. Enabling the strategy authorizes its order submissions; provider rules still apply.";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 EntryHandling = EntryHandling.AllEntries;
@@ -94,8 +94,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 || Position.MarketPosition != MarketPosition.Flat || pendingEntry)
                 return;
 
-            // Explicit execution switch applies to any account type. Never infer
-            // permission to automate from the account name or evaluation status.
+            // User enables the strategy on the chosen account and authorizes order submission.
+            // Provider permission is separate from user consent.
             if (!EnableAutomaticExecution)
                 return;
 
@@ -198,7 +198,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name="Session end HHmm", Order=2, GroupName="Session")]
         public int SessionEnd { get; set; }
         [NinjaScriptProperty]
-        [Display(Name="Enable automatic execution (only where permitted)", Order=1, GroupName="Execution")]
+        [Display(Name="Automatic order execution", Order=1, GroupName="Execution")]
         public bool EnableAutomaticExecution { get; set; }
     }
 }
