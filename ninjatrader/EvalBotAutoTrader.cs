@@ -155,7 +155,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             SetProfitTarget(tag, CalculationMode.Ticks, targetTicks);
             entryStopDistance = stopPoints;
             pendingEntry = true;
+            entryCounted = false;
             lastEntryBar = CurrentBar;
+            SaveDailyState();
             if (buy) EnterLong(qty, tag);
             else EnterShort(qty, tag);
         }
@@ -232,6 +234,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     blocked = true;
                     Print("EvalBot: entry rejected; trading blocked. " + comment);
                 }
+                SaveDailyState();
             }
         }
 
@@ -239,11 +242,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
         {
             if (execution == null || execution.Order == null) return;
-            if ((execution.Order.Name == "EBLong" || execution.Order.Name == "EBShort")
-                && execution.Order.OrderState == OrderState.Filled)
+            if (State == State.Realtime &&
+                (execution.Order.Name == "EBLong" || execution.Order.Name == "EBShort"))
             {
-                tradesToday++;
-                pendingEntry = false;
+                if (!entryCounted)
+                {
+                    entryCounted = true;
+                    tradesToday++;
+                }
+                if (execution.Order.OrderState == OrderState.Filled)
+                    pendingEntry = false;
+                SaveDailyState();
             }
         }
 
