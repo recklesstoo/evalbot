@@ -5,22 +5,22 @@ This is an **experimental native NinjaTrader 8 Strategy** that can submit entrie
 ## Installation and evaluation
 1. Copy `ninjatrader/EvalBotAutoTrader.cs` into NinjaTrader 8's NinjaScript Strategies directory, or paste into a new Strategy named `EvalBotAutoTrader`.
 2. Compile in NinjaScript Editor. **Compilation on an actual NinjaTrader installation has not yet been verified.**
-3. Run in Strategy Analyzer on a 1-minute MNQ chart, then Sim101. Include realistic commissions and slippage.
+3. Test in Strategy Analyzer on a 1-minute MNQ chart; Sim101 is optional, not a runtime dependency. Include realistic commissions and slippage.
 4. Confirm order names, quantity, attached stop/target, daily reset, fills, partial fills, cancellation/rejection handling, and session boundaries.
-5. For live accounts, leave `AllowLiveAccount=false` unless the account provider expressly authorizes automation and the implementation has passed a complete risk review.
+5. `EnableAutomaticExecution=true` by default. The selected NinjaTrader account receives orders when the strategy is enabled. Account-provider rules still apply.
 
 ## Current behavior
 - Native sweep/reclaim entries, ATR stop and reward/risk profit target.
 - Per-trade sizing from point value, daily P&L threshold, trade count cap.
 - Calendar-date daily reset in chart time, optional session hours.
-- Fail-closed rejection behavior; simulated-account default.
+- Fail-closed rejection behavior; account-neutral automatic execution.
 - No external broker credentials, network dependencies, neural model or guaranteed profitability.
 
 ## Known limitations / release blockers
 - The daily P&L counter is strategy-scoped, **not account-wide**. Other strategies and manual trades are not included.
 - Threshold checks run on bar close and cannot guarantee a hard loss cap during gaps or slippage.
 - Working protective order confirmation, partial fills, reconnection reconciliation, pending order timeout, and emergency flat need more testing.
-- Sim101 name check is simplistic; verify actual simulation account names.
+- No Sim101-specific account check. Verify the selected account before enabling.
 - Historical/backtest execution semantics differ from live.
 - 5-day regime adaptation, VWAP, neural inference, and model-based risk filtering are not implemented yet.
 - `OnExecutionUpdate` and `OnOrderUpdate` behaviors must be tested against actual NinjaTrader 8.
