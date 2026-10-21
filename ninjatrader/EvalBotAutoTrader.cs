@@ -27,7 +27,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int lastEntryBar = -1;
         private double carriedRealized;
         private bool stateLoaded, bannerShown;
-        private bool accountRiskVerified;
         private string lastSavedState;
         private bool entryCounted;
 
@@ -58,7 +57,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 SessionStart = 930;
                 SessionEnd = 1130;
                 EnableAutomaticExecution = false;
-                AccountRiskGuardApproved = false;
                 UseTrendFilter = true;
             }
             else if (State == State.DataLoaded)
@@ -133,7 +131,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // User enables the strategy on the chosen account and authorizes order submission.
             // Provider permission is separate from user consent.
-            if (!EnableAutomaticExecution || !AccountRiskGuardApproved)
+            if (!EnableAutomaticExecution || !AccountWideRiskGuardImplemented())
                 return;
 
             double priorHigh = MAX(High, SweepLookback)[1];
@@ -264,11 +262,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        // IMPORTANT: this property remains FALSE until a separately validated account-wide
-        // risk guard is implemented. Strategy-local P&L is NOT account-wide.
-        [NinjaScriptProperty]
-        [Display(Name="Account-wide risk guard verified (NOT IMPLEMENTED)", Order=99, GroupName="Safety")]
-        public bool AccountRiskGuardApproved { get; set; }
+        // Fail closed: no order entry until account-wide risk guard is implemented and tested.
+        private bool AccountWideRiskGuardImplemented() { return false; }
 
         [NinjaScriptProperty]
         [Range(1, 100000)]
