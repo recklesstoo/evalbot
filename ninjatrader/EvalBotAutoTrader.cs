@@ -53,9 +53,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 MaxContracts = 6;
                 SweepLookback = 20;
                 AtrMultiplier = 1.5;
-                SessionStart = 0;
-                SessionEnd = 2359;
-                EnableAutomaticExecution = true;
+                SessionStart = 930;
+                SessionEnd = 1130;
+                EnableAutomaticExecution = false;
             }
             else if (State == State.DataLoaded)
             {
@@ -134,7 +134,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             double priorHigh = MAX(High, SweepLookback)[1];
             double priorLow = MIN(Low, SweepLookback)[1];
             double tick = TickSize;
-            double stopPoints = Math.Ceiling(Math.Max(atr[0] * AtrMultiplier, 4 * tick) / tick) * tick;
+            double stopPoints = Math.Ceiling(Math.Max(atr[1] * AtrMultiplier, 8 * tick) / tick) * tick;
             if (stopPoints <= 0 || Instrument.MasterInstrument.PointValue <= 0)
                 return;
 
@@ -148,7 +148,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (buy == sell) return;
 
             // Attach protective stop and target BEFORE submitting the entry.
-            int stopTicks = Math.Max(4, (int)Math.Round(stopPoints / tick));
+            int stopTicks = Math.Max(8, (int)Math.Round(stopPoints / tick));
             int targetTicks = Math.Max(1, (int)Math.Round(stopTicks * RewardRisk));
             string tag = buy ? "EBLong" : "EBShort";
             SetStopLoss(tag, CalculationMode.Ticks, stopTicks, false);
