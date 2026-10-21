@@ -85,9 +85,32 @@ namespace NinjaTrader.NinjaScript.Strategies
                 tradesToday = 0;
                 blocked = false;
                 pendingEntry = false;
+                carriedRealized = 0;
+                stateLoaded = false;
+                bannerShown = false;
+                lastSavedState = null;
+                entryCounted = false;
             }
 
-            sessionRealized = SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit - sessionStartCumProfit;
+            if (State == State.Realtime && !stateLoaded)
+            {
+                stateLoaded = true;
+                sessionStartCumProfit = SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit;
+                carriedRealized = 0;
+                tradesToday = 0;
+                blocked = false;
+                LoadDailyState();
+            }
+            if (State == State.Realtime && EnableAutomaticExecution && !bannerShown)
+            {
+                bannerShown = true;
+                string accountName = Account == null ? "Unknown" : Account.Name;
+                Print("EvalBot AUTO ON - " + accountName);
+                Draw.TextFixed(this, "EvalBotAutoBanner",
+                    "EvalBot AUTO ON - " + accountName, TextPosition.TopRight);
+            }
+
+            sessionRealized = carriedRealized + SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit - sessionStartCumProfit;
             double unrealized = Position.MarketPosition == MarketPosition.Flat ? 0
                 : Position.GetUnrealizedProfitLoss(PerformanceUnit.Currency, Close[0]);
             if (sessionRealized + unrealized <= -DailyLossLimit || sessionRealized + unrealized >= DailyProfitTarget)
@@ -96,6 +119,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (Position.MarketPosition == MarketPosition.Long) ExitLong("DailyLimit", "EBLong");
                 else if (Position.MarketPosition == MarketPosition.Short) ExitShort("DailyLimit", "EBShort");
             }
+
+            SaveDailyState();
 
             if (blocked || !InSession() || tradesToday >= MaxTradesPerDay
                 || Position.MarketPosition != MarketPosition.Flat || pendingEntry)
