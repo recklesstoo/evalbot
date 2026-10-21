@@ -1,4 +1,4 @@
-# Automatic execution — EvalBot AutoTrader V0.2
+# Automatic execution — EvalBot AutoTrader V0.3
 
 This is an **experimental native NinjaTrader 8 Strategy** that can submit entries and attached protective exits using NinjaTrader's managed order API. It does not depend on the Python signal engine, which remains a separate research prototype.
 
@@ -13,6 +13,8 @@ This is an **experimental native NinjaTrader 8 Strategy** that can submit entrie
 - Native sweep/reclaim entries, ATR stop and reward/risk profit target.
 - Per-trade sizing from point value, daily P&L threshold, trade count cap.
 - Calendar-date daily reset in chart time, optional session hours.
+- Visible chart banner identifying the selected account.
+- Per-account/instrument/date daily state stored under NinjaTrader user data; attempts atomic replacement, avoids unchanged writes, and blocks after invalid recovery or uncertain pending entry.
 - Fail-closed rejection behavior; account-neutral automatic execution.
 - No external broker credentials, network dependencies, neural model or guaranteed profitability.
 
@@ -20,10 +22,11 @@ This is an **experimental native NinjaTrader 8 Strategy** that can submit entrie
 - The daily P&L counter is strategy-scoped, **not account-wide**. Other strategies and manual trades are not included.
 - Threshold checks run on bar close and cannot guarantee a hard loss cap during gaps or slippage.
 - Working protective order confirmation, partial fills, reconnection reconciliation, pending order timeout, and emergency flat need more testing.
+- Persistence cannot establish account-wide P&L or reconcile orphaned broker orders. Concurrent strategy instances sharing an account/instrument can overwrite state.
 - No Sim101-specific account check. Verify the selected account before enabling.
 - Historical/backtest execution semantics differ from live.
 - 5-day regime adaptation, VWAP, neural inference, and model-based risk filtering are not implemented yet.
-- `OnExecutionUpdate` and `OnOrderUpdate` behaviors must be tested against actual NinjaTrader 8.
+- `OnExecutionUpdate`, `OnOrderUpdate`, chart banner and file persistence must be compiled and tested in NinjaTrader 8.
 - Some brokers and evaluation programs prohibit automation, even if the customer acknowledges a sales disclaimer. Do not use to evade these restrictions.
 
 ## Commercial considerations
