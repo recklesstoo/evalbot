@@ -160,6 +160,64 @@ namespace NinjaTrader.NinjaScript.Strategies
             else EnterShort(qty, tag);
         }
 
+
+        private string DailyStatePath()
+        {
+            string account = Account == null ? "unknown" : Account.Name;
+            string symbol = Instrument == null ? "unknown" : Instrument.FullName;
+            string name = account + "_" + symbol + "_" + sessionDate.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
+            foreach (char invalid in Path.GetInvalidFileNameChars()) name = name.Replace(invalid, '_');
+            string dir = Path.Combine(NinjaTrader.Core.Globals.UserDataDir, "EvalBotAutoTrader");
+            Directory.CreateDirectory(dir);
+            return Path.Combine(dir, name + ".state");
+        }
+
+        private void LoadDailyState()
+        {
+            try
+            {
+                string path = DailyStatePath();
+                if (!File.Exists(path)) return;
+                string[] parts = File.ReadAllText(path).Trim().Split('|');
+                if (parts.Length != 5 || parts[0] != "v1") throw new InvalidDataException("Invalid state");
+                tradesToday = int.Parse(parts[1], CultureInfo.InvariantCulture);
+                carriedRealized = double.Parse(parts[2], CultureInfo.InvariantCulture);
+                blocked = parts[3] == "1" || parts[4] == "1";
+                Print("EvalBot restored state: trades=" + tradesToday + " PnL=" + carriedRealized);
+            }
+            catch (Exception ex)
+            {
+                blocked = true;
+                Print("EvalBot recovery failed; blocked: " + ex.Message);
+            }
+        }
+
+        private void SaveDailyState()
+        {
+            if (State != State.Realtime || !stateLoaded) return;
+            try
+            {
+                double realized = carriedRealized +
+                    SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit - sessionStartCumProfit;
+                string data = "v1|" + tradesToday.ToString(CultureInfo.InvariantCulture)
+                    + "|" + realized.ToString("R", CultureInfo.InvariantCulture)
+                    + "|" + (blocked ? "1" : "0")
+                    + "|" + (pendingEntry ? "1" : "0");
+                if (data == lastSavedState) return;
+                string path = DailyStatePath();
+                string temp = path + ".tmp";
+                File.WriteAllText(temp, data);
+                if (File.Exists(path)) File.Replace(temp, path, null);
+                else File.Move(temp, path);
+                lastSavedState = data;
+            }
+            catch (Exception ex)
+            {
+                blocked = true;
+                Print("EvalBot state save failed; blocked: " + ex.Message);
+            }
+        }
+
         protected override void OnOrderUpdate(Order order, double limitPrice, double stopPrice,
             int quantity, int filled, double averageFillPrice, OrderState orderState,
             DateTime time, ErrorCode error, string comment)
