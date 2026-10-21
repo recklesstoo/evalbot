@@ -1,0 +1,5 @@
+numpy>=1.26,<3
+scikit-learn>=1.4,<2
+xgboost>=2,<4
+yfinance>=0.2.40,<2
+tzdata>=2024.1
