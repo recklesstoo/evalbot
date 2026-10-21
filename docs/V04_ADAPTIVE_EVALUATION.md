@@ -12,8 +12,8 @@ The client evaluation bundle is distributed as `EvalBot_V04_Cliente_Evaluacion.z
 
 ## Local checks
 
-Original tester: `python test_backtest.py` passed.
-Adaptive tests: `python test_adaptive.py` passed.
+Earlier local tests were reported, but their source files are not all present in this repository; results are **not reproducible from a clean clone**.
+Adaptive tests cannot be independently rerun from this repository yet.
 No real MNQ dataset, broker connection, Strategy Analyzer parity test or profitability validation was performed.
 
 ## Important
