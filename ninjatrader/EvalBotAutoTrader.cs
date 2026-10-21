@@ -1,0 +1,205 @@
+// EvalBot AutoTrader V0.2 — native NinjaTrader 8 strategy.
+// Standalone execution engine: no Python, bridge, or external service required.
+// Experimental. Validate in Strategy Analyzer and Sim101 before any authorized live use.
+#region Using declarations
+using System;
+using System.ComponentModel.DataAnnotations;
+using NinjaTrader.Cbi;
+using NinjaTrader.Data;
+using NinjaTrader.NinjaScript;
+using NinjaTrader.NinjaScript.Indicators;
+#endregion
+namespace NinjaTrader.NinjaScript.Strategies
+{
+    public class EvalBotAutoTrader : Strategy
+    {
+        private ATR atr;
+        private double sessionRealized, sessionStartCumProfit;
+        private int tradesToday;
+        private DateTime sessionDate = DateTime.MinValue;
+        private bool blocked;
+        private double entryStopDistance;
+        private bool pendingEntry;
+        private int lastEntryBar = -1;
+
+        protected override void OnStateChange()
+        {
+            if (State == State.SetDefaults)
+            {
+                Name = "EvalBotAutoTrader";
+                Description = "Native automatic sweep/reclaim strategy with protective orders and daily risk limits.";
+                Calculate = Calculate.OnBarClose;
+                EntriesPerDirection = 1;
+                EntryHandling = EntryHandling.AllEntries;
+                IsExitOnSessionCloseStrategy = true;
+                ExitOnSessionCloseSeconds = 60;
+                StopTargetHandling = StopTargetHandling.PerEntryExecution;
+                StartBehavior = StartBehavior.WaitUntilFlat;
+                RealtimeErrorHandling = RealtimeErrorHandling.StopCancelClose;
+                BarsRequiredToTrade = 40;
+                IsInstantiatedOnEachOptimizationIteration = true;
+                RiskPerTrade = 100;
+                DailyLossLimit = 400;
+                DailyProfitTarget = 750;
+                RewardRisk = 2.0;
+                MaxTradesPerDay = 3;
+                MaxContracts = 6;
+                SweepLookback = 20;
+                AtrMultiplier = 1.5;
+                SessionStart = 0;
+                SessionEnd = 2359;
+                AllowLiveAccount = false;
+            }
+            else if (State == State.DataLoaded)
+            {
+                atr = ATR(14);
+            }
+        }
+
+        private bool InSession()
+        {
+            int hhmm = ToTime(Time[0]) / 100;
+            return SessionStart <= SessionEnd
+                ? hhmm >= SessionStart && hhmm <= SessionEnd
+                : hhmm >= SessionStart || hhmm <= SessionEnd;
+        }
+
+        protected override void OnBarUpdate()
+        {
+            if (CurrentBar < Math.Max(BarsRequiredToTrade, SweepLookback + 2))
+                return;
+
+            // Calendar-date reset is chart-time based; configure chart time zone deliberately.
+            if (Time[0].Date != sessionDate)
+            {
+                sessionDate = Time[0].Date;
+                sessionStartCumProfit = SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit;
+                sessionRealized = 0;
+                tradesToday = 0;
+                blocked = false;
+                pendingEntry = false;
+            }
+
+            sessionRealized = SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit - sessionStartCumProfit;
+            double unrealized = Position.MarketPosition == MarketPosition.Flat ? 0
+                : Position.GetUnrealizedProfitLoss(PerformanceUnit.Currency, Close[0]);
+            if (sessionRealized + unrealized <= -DailyLossLimit || sessionRealized + unrealized >= DailyProfitTarget)
+            {
+                blocked = true;
+                if (Position.MarketPosition == MarketPosition.Long) ExitLong("DailyLimit", "EBLong");
+                else if (Position.MarketPosition == MarketPosition.Short) ExitShort("DailyLimit", "EBShort");
+            }
+
+            if (blocked || !InSession() || tradesToday >= MaxTradesPerDay
+                || Position.MarketPosition != MarketPosition.Flat || pendingEntry)
+                return;
+
+            // Fail closed for non-simulated accounts unless operator has explicitly enabled
+            // live-account execution AND confirmed that automation is permitted.
+            if (State == State.Realtime && !AllowLiveAccount && Account != null
+                && Account.Name != "Sim101")
+                return;
+
+            double priorHigh = MAX(High, SweepLookback)[1];
+            double priorLow = MIN(Low, SweepLookback)[1];
+            double tick = TickSize;
+            double stopPoints = Math.Ceiling(Math.Max(atr[0] * AtrMultiplier, 4 * tick) / tick) * tick;
+            if (stopPoints <= 0 || Instrument.MasterInstrument.PointValue <= 0)
+                return;
+
+            // Round down size to stay within configured per-trade risk.
+            int qty = Math.Min(MaxContracts,
+                (int)Math.Floor(RiskPerTrade / (stopPoints * Instrument.MasterInstrument.PointValue)));
+            if (qty < 1) return;
+
+            bool buy = Low[0] < priorLow - tick && Close[0] > priorLow && Close[0] > Open[0];
+            bool sell = High[0] > priorHigh + tick && Close[0] < priorHigh && Close[0] < Open[0];
+            if (buy == sell) return;
+
+            // Attach protective stop and target BEFORE submitting the entry.
+            int stopTicks = Math.Max(4, (int)Math.Round(stopPoints / tick));
+            int targetTicks = Math.Max(1, (int)Math.Round(stopTicks * RewardRisk));
+            string tag = buy ? "EBLong" : "EBShort";
+            SetStopLoss(tag, CalculationMode.Ticks, stopTicks, false);
+            SetProfitTarget(tag, CalculationMode.Ticks, targetTicks);
+            entryStopDistance = stopPoints;
+            pendingEntry = true;
+            lastEntryBar = CurrentBar;
+            if (buy) EnterLong(qty, tag);
+            else EnterShort(qty, tag);
+        }
+
+        protected override void OnOrderUpdate(Order order, double limitPrice, double stopPrice,
+            int quantity, int filled, double averageFillPrice, OrderState orderState,
+            DateTime time, ErrorCode error, string comment)
+        {
+            if (order == null || (order.Name != "EBLong" && order.Name != "EBShort"))
+                return;
+            if (orderState == OrderState.Rejected || orderState == OrderState.Cancelled)
+            {
+                pendingEntry = false;
+                if (orderState == OrderState.Rejected)
+                {
+                    blocked = true;
+                    Print("EvalBot: entry rejected; trading blocked. " + comment);
+                }
+            }
+        }
+
+        protected override void OnExecutionUpdate(Execution execution, string executionId,
+            double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
+        {
+            if (execution == null || execution.Order == null) return;
+            if ((execution.Order.Name == "EBLong" || execution.Order.Name == "EBShort")
+                && execution.Order.OrderState == OrderState.Filled)
+            {
+                tradesToday++;
+                pendingEntry = false;
+            }
+        }
+
+        [NinjaScriptProperty]
+        [Range(1, 100000)]
+        [Display(Name="Risk per trade ($)", Order=1, GroupName="Risk")]
+        public double RiskPerTrade { get; set; }
+        [NinjaScriptProperty]
+        [Range(1, 100000)]
+        [Display(Name="Daily loss limit ($)", Order=2, GroupName="Risk")]
+        public double DailyLossLimit { get; set; }
+        [NinjaScriptProperty]
+        [Range(1, 100000)]
+        [Display(Name="Daily profit target ($)", Order=3, GroupName="Risk")]
+        public double DailyProfitTarget { get; set; }
+        [NinjaScriptProperty]
+        [Range(0.5, 10)]
+        [Display(Name="Reward / Risk", Order=4, GroupName="Risk")]
+        public double RewardRisk { get; set; }
+        [NinjaScriptProperty]
+        [Range(1, 20)]
+        [Display(Name="Max trades per day", Order=5, GroupName="Risk")]
+        public int MaxTradesPerDay { get; set; }
+        [NinjaScriptProperty]
+        [Range(1, 100)]
+        [Display(Name="Max contracts", Order=6, GroupName="Risk")]
+        public int MaxContracts { get; set; }
+        [NinjaScriptProperty]
+        [Range(5, 200)]
+        [Display(Name="Sweep lookback", Order=1, GroupName="Signal")]
+        public int SweepLookback { get; set; }
+        [NinjaScriptProperty]
+        [Range(0.5, 10)]
+        [Display(Name="ATR multiplier", Order=2, GroupName="Signal")]
+        public double AtrMultiplier { get; set; }
+        [NinjaScriptProperty]
+        [Range(0, 2359)]
+        [Display(Name="Session start HHmm", Order=1, GroupName="Session")]
+        public int SessionStart { get; set; }
+        [NinjaScriptProperty]
+        [Range(0, 2359)]
+        [Display(Name="Session end HHmm", Order=2, GroupName="Session")]
+        public int SessionEnd { get; set; }
+        [NinjaScriptProperty]
+        [Display(Name="Allow live account (only where permitted)", Order=1, GroupName="Execution")]
+        public bool AllowLiveAccount { get; set; }
+    }
+}
