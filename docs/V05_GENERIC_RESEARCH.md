@@ -10,7 +10,7 @@
 4. **Validación:** división temporal 60/20/20 con purga de etiquetas solapadas. Se reportan AUC, Brier y R medio de operaciones seleccionadas con costos aproximados.
 5. **Abstención:** si la probabilidad estimada no supera el umbral económico, no hay señal.
 
-## Windows
+## Current review status\n\n**REJECTED pending reproducibility and validation.** The documented commands cannot all run from a clean clone. The strategy has not been compiled in NinjaTrader. Do not treat the reported selected mean R as executable P&L.\n\n## Windows
 
 ```powershell
 pip install numpy scikit-learn xgboost yfinance tzdata
