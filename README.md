@@ -1,26 +1,21 @@
-# EvalBot AI — MVP 0.1
+# EvalBot — experimental NinjaTrader strategy and Python research
 
-**Experimental, signal-only prototype.** No order submission, broker login, or trained neural network.
+**Status: NOT APPROVED for production or profitability claims.**
 
-## Architecture
+## Two separate components
 
-Rithmic → NinjaTrader 8 → NinjaScript Data Bridge → local HTTP receiver → regime/signal engine → browser dashboard.
+- `ninjatrader/EvalBotAutoTrader.cs`: Native NinjaTrader 8 Strategy that can submit real orders to the selected account. Automatic execution is **disabled by default** and must be explicitly enabled. Its safety and order handling have **not** been compiled or validated in NinjaTrader.
+- `engine/` and `ninjatrader/EvalBotDataBridge.cs`: separate signal-only research prototype; not required by the native Strategy.
+- `tester/`: Python experimental research. The repo is currently **incomplete**; required tester dependencies and scripts must be added before reproducible tests can be claimed.
 
-The intended implementation uses a lightweight NinjaTrader indicator to export closed 1-minute OHLCV bars, a local analysis engine to classify trend/range and identify liquidity sweeps, and a read-only dashboard. NinjaTrader remains the licensed data-feed client. The operator confirms orders manually.
+## Known release blockers
 
-## Development milestones
+1. Full reproducibility from a clean clone, pinned dependencies and CI.
+2. NinjaTrader compilation, strategy-analyzer parity, account-wide risk controls, restart and order reconciliation.
+3. Reliable out-of-sample evaluation on real market data.
 
-1. Compile and validate NinjaScript bridge in NinjaTrader 8.
-2. Compare exported bars, timestamps, and session boundaries with NinjaTrader.
-3. Add 5-session regime detection, session VWAP and liquidity levels.
-4. Port EvalBot V1.2 signals and reconcile its 205 historical trades.
-5. Train ML models with walk-forward evaluation, calibrated probabilities and fees/slippage.
-6. Add account-level risk simulation and monitoring.
-
-## Risk and compliance
-
-Do not distribute licensed market data or broker credentials. Respect Apex, NinjaTrader and Rithmic terms. No automated order submission in accounts without explicit authorization. The prototype has not been validated for live trading.
+See `docs/V05_GENERIC_RESEARCH.md` and `docs/V04_ADAPTIVE_EVALUATION.md`. Synthetic tests do not establish profitability.
 
 ## License
 
-All rights reserved unless a license is added by the owner. No third-party NinjaTrader code is copied. The morluto/rea project is research tooling only, not a runtime dependency.
+All rights reserved unless a license is explicitly added by the repository owner.
