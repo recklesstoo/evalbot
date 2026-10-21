@@ -48,7 +48,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 AtrMultiplier = 1.5;
                 SessionStart = 0;
                 SessionEnd = 2359;
-                AllowLiveAccount = false;
+                EnableAutomaticExecution = true;
             }
             else if (State == State.DataLoaded)
             {
@@ -94,10 +94,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 || Position.MarketPosition != MarketPosition.Flat || pendingEntry)
                 return;
 
-            // Fail closed for non-simulated accounts unless operator has explicitly enabled
-            // live-account execution AND confirmed that automation is permitted.
-            if (State == State.Realtime && !AllowLiveAccount && Account != null
-                && Account.Name != "Sim101")
+            // Explicit execution switch applies to any account type. Never infer
+            // permission to automate from the account name or evaluation status.
+            if (!EnableAutomaticExecution)
                 return;
 
             double priorHigh = MAX(High, SweepLookback)[1];
@@ -199,7 +198,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name="Session end HHmm", Order=2, GroupName="Session")]
         public int SessionEnd { get; set; }
         [NinjaScriptProperty]
-        [Display(Name="Allow live account (only where permitted)", Order=1, GroupName="Execution")]
-        public bool AllowLiveAccount { get; set; }
+        [Display(Name="Enable automatic execution (only where permitted)", Order=1, GroupName="Execution")]
+        public bool EnableAutomaticExecution { get; set; }
     }
 }
