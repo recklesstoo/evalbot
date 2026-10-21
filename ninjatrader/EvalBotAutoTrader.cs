@@ -17,6 +17,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     public class EvalBotAutoTrader : Strategy
     {
         private ATR atr;
+        private EMA trendEma;
         private double sessionRealized, sessionStartCumProfit;
         private int tradesToday;
         private DateTime sessionDate = DateTime.MinValue;
@@ -56,10 +57,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 SessionStart = 930;
                 SessionEnd = 1130;
                 EnableAutomaticExecution = false;
+                UseTrendFilter = true;
             }
             else if (State == State.DataLoaded)
             {
                 atr = ATR(14);
+                trendEma = EMA(50);
             }
         }
 
@@ -146,6 +149,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             bool buy = Low[0] < priorLow - tick && Close[0] > priorLow && Close[0] > Open[0];
             bool sell = High[0] > priorHigh + tick && Close[0] < priorHigh && Close[0] < Open[0];
             if (buy == sell) return;
+            // Optional structural filter: avoid fading the 50-bar trend.
+            if (UseTrendFilter && ((buy && Close[0] < trendEma[0]) ||
+                (sell && Close[0] > trendEma[0]))) return;
 
             // Attach protective stop and target BEFORE submitting the entry.
             int stopTicks = Math.Max(8, (int)Math.Round(stopPoints / tick));
@@ -296,6 +302,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(0, 2359)]
         [Display(Name="Session end HHmm", Order=2, GroupName="Session")]
         public int SessionEnd { get; set; }
+        [NinjaScriptProperty]
+        [Display(Name="EMA50 trend filter", Order=3, GroupName="Signal")]
+        public bool UseTrendFilter { get; set; }
         [NinjaScriptProperty]
         [Display(Name="Automatic order execution", Order=1, GroupName="Execution")]
         public bool EnableAutomaticExecution { get; set; }
