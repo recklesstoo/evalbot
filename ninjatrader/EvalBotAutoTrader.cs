@@ -1,13 +1,16 @@
-// EvalBot AutoTrader V0.2 — native NinjaTrader 8 strategy.
+// EvalBot AutoTrader V0.3 — native NinjaTrader 8 strategy.
 // Standalone execution engine: no Python, bridge, or external service required.
 // Experimental automatic strategy. No mandatory Sim101 step; validate before deployment.
 #region Using declarations
 using System;
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
+using System.IO;
 using NinjaTrader.Cbi;
 using NinjaTrader.Data;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.Indicators;
+using NinjaTrader.NinjaScript.DrawingTools;
 #endregion
 namespace NinjaTrader.NinjaScript.Strategies
 {
@@ -21,6 +24,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double entryStopDistance;
         private bool pendingEntry;
         private int lastEntryBar = -1;
+        private double carriedRealized;
+        private bool stateLoaded, bannerShown;
+        private string lastSavedState;
+        private bool entryCounted;
 
         protected override void OnStateChange()
         {
