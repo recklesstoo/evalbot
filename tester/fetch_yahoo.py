@@ -38,16 +38,31 @@ def fetch(symbol, days):
     return rows
 
 
+def fetch_daily(symbol):
+    """Full daily history (for regime labelling, not for the 1-minute backtest). timestamp = session date."""
+    import yfinance as yf
+    df = yf.Ticker(symbol).history(period="max", interval="1d", auto_adjust=False)
+    rows = {}
+    for ts, r in df.iterrows():
+        if any(v != v for v in (r["Open"], r["High"], r["Low"], r["Close"])):
+            continue
+        key = ts.strftime("%Y-%m-%d")
+        rows[key] = dict(timestamp=key, open=r["Open"], high=r["High"], low=r["Low"],
+                         close=r["Close"], volume=r["Volume"])
+    return rows
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--symbol", default="MNQ=F")
     ap.add_argument("--days", type=int, default=29, help="ventana hacia atras (Yahoo permite ~30)")
+    ap.add_argument("--daily", action="store_true", help="historia diaria completa (timestamp = fecha de sesion)")
     ap.add_argument("--out", default="data/MNQ_1m.csv")
     args = ap.parse_args(argv)
     out = Path(args.out)
     merged = read_existing(out)
     before = len(merged)
-    merged.update(fetch(args.symbol, args.days))
+    merged.update(fetch_daily(args.symbol) if args.daily else fetch(args.symbol, args.days))
     if not merged:
         print("Yahoo no devolvio barras; no se escribio nada.", file=sys.stderr)
         return 1
