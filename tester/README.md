@@ -13,9 +13,9 @@ mide el resultado **con comisiones y slippage**. No se conecta a ningún broker 
 ## Uso
 
 ```bash
-pip install yfinance tzdata
-python fetch_yahoo.py                              # data/MNQ_1m.csv
-python test_backtest.py                            # debe terminar en "Todas las pruebas pasaron."
+pip install -r requirements.txt                    # versiones fijadas
+python fetch_yahoo.py                              # data/MNQ_1m.csv (Yahoo, ~29 días; está en .gitignore)
+python -m unittest discover -p "test_*.py" -v      # debe terminar en "OK"
 python backtest.py data/MNQ_1m.csv                 # réplica del .cs
 python backtest.py data/MNQ_1m.csv --compare       # variantes
 python backtest.py data/MNQ_1m.csv --start 2026-09-01 --end 2026-09-30 --trades-out trades.csv
@@ -26,22 +26,44 @@ Todos los parámetros están en `Params` (mismos nombres y valores por defecto q
 
 ## Qué replica del `.cs`
 
-Señal de barrido (máx/mín de las 20 barras previas, cierre de recuperación, vela a favor), ATR(14) de
-Wilder como NinjaTrader, stop = ATR×1.5 redondeado al tick (mín. 4 ticks), objetivo = stop×2,
-tamaño = `RiskPerTrade / (stop × valor del punto)` con tope de contratos, máx. operaciones por día,
-límites de pérdida/ganancia diarios (evaluados al cierre de barra), filtro de horario, reinicio diario
-a medianoche del gráfico, cierre a las 16:59 ET. Entrada a mercado en la apertura de la barra siguiente.
+Señal de barrido (máx/mín de las 20 barras previas ±1 tick, cierre de recuperación, vela a favor, filtro
+EMA50 activado por defecto), ATR(14) de Wilder como NinjaTrader, stop = ATR de la barra previa × 1.5
+redondeado hacia arriba al tick (**mínimo 8 ticks**, igual que el `.cs`), objetivo = stop × 2,
+tamaño = `RiskPerTrade / (stop × valor del punto)` redondeado hacia abajo con tope de contratos, máx.
+operaciones por día, límites de pérdida/ganancia diarios (evaluados al cierre de barra; la salida es a
+mercado en la apertura siguiente), sesión 09:30–11:30, reinicio diario, cierre a las 16:59 en `chart_tz`.
+Entrada a mercado en la apertura de la barra siguiente.
+
+## Costos por operación
+
+`cost_R_i = (comisión + patas_con_slippage × slippage_ticks × tick × valor_punto) / (stop_puntos × valor_punto)`.
+Una operación que cierra en el objetivo tiene 1 pata con slippage (la entrada); una que cierra en stop,
+gap, límite diario o cierre de sesión tiene 2. Se cumple `r_net = r_gross − cost_R_i` y las pruebas lo
+verifican. Comisión por defecto: **2.80 USD** ida y vuelta por contrato (igual que el preregistro).
+
+## Diferencias deliberadas respecto al `.cs` (revisar)
+
+- El `.cs` **solo cuenta `tradesToday` en tiempo real** (`State == Realtime`), así que en Strategy Analyzer
+  el límite de 3 operaciones al día no se aplicaría. El tester lo aplica, que es la intención del diseño.
+- `AccountWideRiskGuardImplemented()` devuelve siempre `false`: el `.cs` actual **no envía órdenes**.
+  El tester ignora ese guard para poder medir la lógica.
+- El `.cs` no tiene hora de cierre propia: sale por `IsExitOnSessionCloseStrategy` (plantilla de sesión,
+  60 s antes del cierre). El tester usa `flatten_hhmm=1659`.
+- Fórmula del ATR con calentamiento y stop/objetivo en la misma barra de entrada: **no verificados contra
+  NinjaTrader**; es justo lo que debe comprobar la prueba de paridad.
 
 ## Supuestos que el consultor debe revisar
 
 - **Stop y objetivo en la misma barra → se asume el stop primero** (conservador).
 - **Slippage** (1 tick por defecto) en entradas a mercado y salidas por stop/mercado; los objetivos
-  (límite) se llenan sin slippage. **Comisión** 1.00 USD ida y vuelta por contrato: ajustar al broker real.
-- **Gap sobre el stop → se llena en la apertura** (peor que el stop).
-- **Hora de la barra:** Yahoo da el *inicio*; NinjaTrader marca el *cierre*. El tester suma 1 minuto.
-- **Zona horaria del gráfico:** `chart_tz` (por defecto `America/Panama`). Con `--set day_mode=cme` el día
-  de trading cambia a las 18:00 ET en vez de medianoche (la réplica fiel del `.cs` es `calendar`).
-- Si la barra siguiente no es contigua (cierre diario, hueco de datos) la señal se descarta.
+  (límite) se llenan sin slippage y, si el precio los atraviesa con gap, se llenan en el objetivo (conservador).
+- **Gap sobre el stop → se llena en la apertura** (peor que el stop), más el slippage.
+- **Hora de la barra:** el CSV trae el *inicio*; NinjaTrader marca el *cierre*. El tester suma 1 minuto.
+- **Zona horaria del gráfico:** `chart_tz` (por defecto `America/New_York`, con horario de verano). Con
+  `--set day_mode=cme` el día de trading cambia a las 18:00 ET en vez de medianoche (la réplica fiel del
+  `.cs` es `calendar`). Los timestamps sin offset se interpretan con `--input-tz` (defecto UTC).
+- Si la barra siguiente no es contigua (cierre diario, hueco de datos) la señal se descarta; una posición
+  abierta cuando aparece un hueco se cierra en la apertura siguiente (`DATA_GAP`).
 
 ## Qué NO modela
 
